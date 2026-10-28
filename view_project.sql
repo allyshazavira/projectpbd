@@ -1,150 +1,55 @@
--- CREATE DATABASE project_apotek;
-USE project_apotek;
-CREATE TABLE role (
-	idrole INT PRIMARY KEY,
-    nama_role VARCHAR(100) NOT NULL
-    );
+use project_apotek;
 
-CREATE TABLE user (
-	iduser INT PRIMARY KEY,
-    username VARCHAR(45) NOT NULL,
-    password VARCHAR(100) NOT NULL,
-    idrole INT NOT NULL,
-    foreign key (idrole) references role(idrole)
-);
+CREATE OR REPLACE VIEW viewsatuan
+AS SELECT idsatuan AS ID, nama_satuan AS SATUAN,
+	CASE
+		WHEN status = 0 THEN 'Tidak Aktif'
+        ELSE 'Aktif'
+	END AS STATUS
+FROM satuan;
 
-CREATE TABLE satuan (
-	idsatuan INT primary key,
-    nama_satuan varchar(45) not null,
-    status tinyint not null
-);
+CREATE OR REPLACE VIEW viewrole
+AS SELECT idrole AS ID, nama_role AS "Nama Role" FROM role;
 
-CREATE TABLE barang (
-	idbarang INT primary key,
-    jenis char(1) not null,
-    nama varchar(45) not null,
-    idsatuan int not null,
-    status tinyint not null,
-    harga int not null,
-    foreign key (idsatuan) references satuan(idsatuan)
-);
+CREATE OR REPLACE VIEW viewuser
+AS SELECT u.iduser AS ID, u.username AS Username, r.nama_role AS Role
+FROM user u
+JOIN role r ON u.idrole = r.idrole;
 
-CREATE TABLE kartu_stok (
-	idkartu_stok bigint primary key,
-    jenis_transaksi char(1) not null,
-    masuk int not null,
-    keluar int not null,
-    stock int not null,
-    created_at timestamp default current_timestamp,
-    idtransaksi int not null,
-    idbarang int not null,
-    foreign key (idbarang) references barang(idbarang)
-);
-select * from kartu_stok;
+CREATE OR REPLACE VIEW viewvendor
+AS SELECT idvendor, nama_vendor, badan_hukum,
+	CASE badan_hukum
+		WHEN 'P' THEN 'PT'
+        WHEN 'C' THEN 'CV'
+	END AS 'Badan Hukum',
+    CASE status
+		WHEN 0 THEN 'Tidak Aktif'
+        ELSE 'Aktif'
+	END AS 'Status'
+FROM vendor;
 
-CREATE TABLE vendor (
-	idvendor int primary key,
-    nama_vendor varchar(100) not null,
-    badan_hukum char(1) not null,
-    status char(1) not null
-);
+CREATE OR REPLACE VIEW viewmargin
+AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE, 
+	CASE m.status
+		WHEN 0 THEN 'Tidak aktif'
+        ELSE 'Aktif'
+	END AS Status,
+u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at  AS 'Tanggal diubah'
+FROM margin_penjualan m
+JOIN user u ON m.iduser = u.iduser;
 
-CREATE TABLE margin_penjualan (
-	idmargin_penjualan int primary key,
-    created_at timestamp default current_timestamp,
-    persen double not null,
-    status tinyint not null,
-    iduser int not null,
-    updated_at timestamp default current_timestamp on update current_timestamp,
-    foreign key (iduser) references user(iduser)
-);
+CREATE OR REPLACE VIEW viewbarang
+AS SELECT b.idbarang AS ID,
+	CASE b.jenis
+		WHEN 'O' THEN 'Obat'
+        WHEN 'A' THEN 'Alat Kesehatan'
+	END AS Kategori,
+    b.nama AS nama_barang, s.nama_satuan AS Satuan, b.harga AS Harga, 
+    CASE b.status
+		WHEN 0 THEN 'Tidak Aktif'
+        ELSE 'Aktif'
+	END AS 'Status'
+FROM barang b
+JOIN satuan s ON b.idsatuan = s.idsatuan;
 
-CREATE TABLE pengadaan (
-	idpengadaan bigint primary key,
-    timestamp timestamp default current_timestamp,
-    user_iduser int not null,
-    status char(1) not null,
-    vendor_idvendor int not null,
-    subtotal_nilai int not null,
-    ppn int not null,
-    total_nilai int not null,
-    foreign key (user_iduser) references user(iduser),
-    foreign key (vendor_idvendor) references vendor(idvendor)
-);
-CREATE TABLE detail_pengadaan (
-	iddetail_pengadaan bigint primary key,
-    harga_satuan int not null,
-    jumlah int not null,
-    sub_total int not null,
-    idbarang int not null,
-    idpengadaan bigint not null,
-    foreign key (idbarang) references barang(idbarang),
-    foreign key (idpengadaan) references pengadaan(idpengadaan)
-);
-
-CREATE TABLE penerimaan (
-	idpenerimaan bigint primary key,
-    created_at timestamp default current_timestamp,
-    status char(4) not null,
-    idpengadaan bigint not null,
-    iduser int not null,
-    foreign key (idpengadaan) references pengadaan(idpengadaan),
-    foreign key (iduser) references user(iduser)
-);
-
-CREATE TABLE detail_penerimaan (
-	iddetail_penerimaan bigint primary key,
-    idpenerimaan bigint not null,
-    barang_idbarang int not null,
-    jumlah_terima int not null,
-    harga_satuan_terima int not null,
-    sub_total_terima int not null,
-    foreign key (idpenerimaan) references penerimaan(idpenerimaan),
-    foreign key (barang_idbarang) references barang(idbarang)
-);
-
-CREATE TABLE retu (
-	idretur bigint primary key,
-    created_at timestamp default current_timestamp,
-    idpenerimaan bigint not null,
-    iduser int not null,
-    foreign key (idpenerimaan) references penerimaan(idpenerimaan),
-    foreign key (iduser) references user(iduser)
-);
-
-CREATE TABLE detail_retur (
-	iddetail_retur bigint primary key,
-    jumlah int not null,
-    alasan varchar(200) not null,
-    idretur bigint not null,
-    iddetail_penerimaan bigint not null,
-    foreign key (idretur) references retu(idretur),
-    foreign key (iddetail_penerimaan) references detail_penerimaan(iddetail_penerimaan)
-);
-
-CREATE TABLE penjualan (
-	idpenjualan int primary key,
-    created_at timestamp default current_timestamp,
-    subtotal_nilai int not null,
-    ppn int not null,
-    total_nilai int not null,
-    iduser int not null,
-    idmargin_penjualan int not null,
-    foreign key (iduser) references user(iduser),
-    foreign key (idmargin_penjualan) references margin_penjualan(idmargin_penjualan)
-);
-
-CREATE TABLE detail_penjualan (
-	iddetail_penjualan bigint primary key,
-    harga_satuan int not null,
-    jumlah int not null,
-    subtotal int not null,
-    penjualan_idpenjualan int not null,
-    idbarang int not null,
-    foreign key (penjualan_idpenjualan) references penjualan(idpenjualan),
-    foreign key (idbarang) references barang(idbarang)
-);
-
-DELIMITER $$
-CREATE FUNCTION hitung_subtotal(p_harga_satuan INT, p_jumlah INT)
-
+select * from viewbarang
