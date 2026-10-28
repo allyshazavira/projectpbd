@@ -1,13 +1,9 @@
-CREATE DATABASE project_apotek;
+-- CREATE DATABASE project_apotek;
 USE project_apotek;
 CREATE TABLE role (
 	idrole INT PRIMARY KEY,
     nama_role VARCHAR(100) NOT NULL
     );
-
-SET FOREIGN_KEY_CHECKS = 0; 
-TRUNCATE TABLE margin_penjualan; 
-SET FOREIGN_KEY_CHECKS = 1;
 
 CREATE TABLE user (
 	iduser INT PRIMARY KEY,
@@ -148,3 +144,7 @@ CREATE TABLE detail_penjualan (
     foreign key (penjualan_idpenjualan) references penjualan(idpenjualan),
     foreign key (idbarang) references barang(idbarang)
 );
+
+DELIMITER $$
+CREATE FUNCTION hitung_subtotal(p_harga_satuan INT, p_jumlah INT)
+
