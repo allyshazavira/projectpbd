@@ -145,6 +145,98 @@ CREATE TABLE detail_penjualan (
     foreign key (idbarang) references barang(idbarang)
 );
 
+USE project_apotek;
+INSERT INTO role (nama_role, idrole) VALUES 
+('Apoteker Penanggung Jawab', 1),
+('Asisten Apoteker / Kasir', 2),
+('Petugas Gudang Obat', 3);
+select * from barang;
+
+INSERT INTO user (username, password, idrole, iduser) VALUES
+('apoteker_sherin', 'hashed_pass_apoteker', 1, 260501),
+('kasir_bhanu', 'hashed_pass_kasir', 2, 260502),
+('gudang_shaka', 'hashed_pass_gudang', 3, 260503);
+
+INSERT INTO satuan (nama_satuan, status, idsatuan) VALUES
+('Strip', 1, 1),
+('Box', 1, 2),
+('Botol', 1, 3),
+('Tube', 1, 4),
+('Tablet', 1, 5);
+
+INSERT INTO vendor (nama_vendor, badan_hukum, status, idvendor) VALUES
+('PT Kimia Farma Trading & Distribution', 'P', 1, 10),
+('PT Mandira Distra Abadi', 'P', 1, 20),
+('PT Anugerah Argon Medika', 'P', 1, 30);
+
+INSERT INTO margin_penjualan (persen, status, iduser, idmargin_penjualan) VALUES
+(10.0, 1, 260501, 1),
+(20.0, 1, 260501, 2),
+(30.0, 1, 260501, 3),
+(40.0, 1, 260501, 4),
+(50.0, 1, 260501, 5);
+
+INSERT INTO barang (idbarang, jenis, nama, idsatuan, status, harga) VALUES
+(001, 'O', 'Paracetamol 500mg Tablet', 5, 1, 3000),
+(002, 'O', 'Ibuprofen 400mg Strip', 1, 1, 7000),
+(003, 'O', 'Sirup Batuk Botol', 3, 1, 20000),
+(004, 'A', 'Masker Kesehatan 3ply Box', 2, 1, 42000),
+(005, 'A', 'Termometer Suhu Digital Box', 2, 1, 25000);
+use project_apotek;
+
+CREATE OR REPLACE VIEW viewsatuan
+AS SELECT idsatuan AS ID, nama_satuan AS SATUAN,
+	CASE
+		WHEN status = 0 THEN 'Tidak Aktif'
+        ELSE 'Aktif'
+	END AS STATUS
+FROM satuan;
+
+CREATE OR REPLACE VIEW viewrole
+AS SELECT idrole AS ID, nama_role AS "Nama Role" FROM role;
+
+CREATE OR REPLACE VIEW viewuser
+AS SELECT u.iduser AS ID, u.username AS Username, r.nama_role AS Role
+FROM user u
+JOIN role r ON u.idrole = r.idrole;
+
+CREATE OR REPLACE VIEW viewvendor
+AS SELECT idvendor, nama_vendor, badan_hukum,
+	CASE badan_hukum
+		WHEN 'P' THEN 'PT'
+        WHEN 'C' THEN 'CV'
+	END AS 'Badan Hukum',
+    CASE status
+		WHEN 0 THEN 'Tidak Aktif'
+        ELSE 'Aktif'
+	END AS 'Status'
+FROM vendor;
+
+CREATE OR REPLACE VIEW viewmargin
+AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE, 
+	CASE m.status
+		WHEN 0 THEN 'Tidak aktif'
+        ELSE 'Aktif'
+	END AS Status,
+u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at  AS 'Tanggal diubah'
+FROM margin_penjualan m
+JOIN user u ON m.iduser = u.iduser;
+
+CREATE OR REPLACE VIEW viewbarang
+AS SELECT b.idbarang AS ID,
+	CASE b.jenis
+		WHEN 'O' THEN 'Obat'
+        WHEN 'A' THEN 'Alat Kesehatan'
+	END AS Kategori,
+    b.nama AS nama_barang, s.nama_satuan AS Satuan, b.harga AS Harga, 
+    CASE b.status
+		WHEN 0 THEN 'Tidak Aktif'
+        ELSE 'Aktif'
+	END AS 'Status'
+FROM barang b
+JOIN satuan s ON b.idsatuan = s.idsatuan;
+
+select * from viewbarang
 DELIMITER $$
 CREATE FUNCTION hitung_subtotal(p_harga_satuan INT, p_jumlah INT)
 RETURNS INT 
@@ -200,4 +292,67 @@ BEGIN
     JOIN satuan s ON b.idsatuan = s.idsatuan
     WHERE b.status = 1
     ORDER BY b.nama;
+END $$
+
+CREATE PROCEDURE sp_laporan_penjualan(IN p_tanggal_awal DATE, IN p_tanggal_akhir DATE)
+BEGIN
+	SELECT p.idpenjualan AS 'No Penjualan', p.crated_at AS Tanggal, u.username AS Kasir, 
+    p.subtotal_nilai AS Subtotal, p.ppn AS PPN, p.total_nilai AS Total
+    FROM penjualan p
+    JOIN user u ON p.iduser = u.iduser
+    WHERE DATE(p.created_at) BETWEEN p_tanggal_awal AND p_tanggal_akhir
+    ORDER BY p.created_at;
+END $$
+
+CREATE TRIGGER trg_barang_bi
+BEFORE INSERT ON barang
+FOR EACH ROW
+BEGIN
+	IF NEW.harga <= 0 THEN
+		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga barang harus lebih dari 0';
+	END IF;
+    IF NEW.jenis NOT IN ('O', 'A') THEN
+		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jenis barang harus O (Obat) atau A (Alat Kesehatan)';
+        END IF;
+END $$
+
+CREATE TRIGGER trg_barang_bu
+BEFORE UPDATE ON barang
+FOR EACH ROW
+BEGIN
+	IF NEW.harga <= 0 THEN
+		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga barang harus lebih dari 0';
+	END IF;
+    IF NEW.jenis NOT IN ('O', 'A') THEN
+		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jenis barang harus O (Obat) atau A (Alat Kesehatan)';
+        END IF;
+END $$
+
+CREATE TRIGGER trg_margin_bi_aktif
+BEFORE INSERT ON margin_penjualan
+FOR EACH ROW
+BEGIN
+	IF NEW.status = 1 AND EXISTS
+		(SELECT 1 FROM margin_penjualan WHERE status = 1) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Masih ada margin aktif, nonaktifkan terlebih dahulu';
+	END IF;
+END $$
+
+CREATE TRIGGER trg_margin_bu_aktif
+BEFORE UPDATE ON margin_penjualan
+FOR EACH ROW
+BEGIN
+	IF NEW.status = 1 AND OLD.status = 0 AND EXISTS
+    (SELECT 1 FROM margin_penjualan WHERE status = 1 AND idmargin_penjualan <> NEW.idmargin_penjualan) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Masih ada margin aktif, nonaktifkan terlebih dahulu';
+	END IF;
+END $$
+
+CREATE TRIGGER trg_user_bi BEFORE INSERT ON user
+FOR EACH ROW
+BEGIN
+    IF NEW.iduser IS NULL OR NEW.iduser = 0 THEN
+        SET NEW.iduser = COALESCE((SELECT MAX(iduser) FROM user), 260500) + 1;
+    END IF;
+END$$
 DELIMITER ;

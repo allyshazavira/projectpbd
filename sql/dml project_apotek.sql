@@ -35,4 +35,3 @@ INSERT INTO barang (idbarang, jenis, nama, idsatuan, status, harga) VALUES
 (003, 'O', 'Sirup Batuk Botol', 3, 1, 20000),
 (004, 'A', 'Masker Kesehatan 3ply Box', 2, 1, 42000),
 (005, 'A', 'Termometer Suhu Digital Box', 2, 1, 25000);
-drop table role
