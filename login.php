@@ -1,30 +1,37 @@
 <?php
-session_start();
-include 'DBconnection.php';
+require_once 'helpers.php';
 
-if (isset($_POST['username']) && isset($_POST['password'])) {
-    
-    $username = $_POST['username'];
-    $password = $_POST['password'];
-
-    $query = "SELECT u.*, r.nama_role FROM user u 
-              JOIN role r ON u.idrole = r.idrole 
-              WHERE u.username = '$username'";
-    $result = mysqli_query($conn, $query);
-    $user = mysqli_fetch_assoc($result);
-
-    if ($user && $password == $user['password']) {
-        $_SESSION['iduser'] = $user['iduser'];
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['role'] = $user['nama_role'];
-
-        header("Location: index.php");
-        exit();
-    } else {
-        echo "<script>alert('Login gagal! Username atau password salah.'); window.location='tampilan_login.php';</script>";
-    }
-} else {
-    header("Location: tampilan_login.php");
-    exit();
+if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['username'], $_POST['password'])) {
+    redirect('tampilan_login.php');
 }
-?>
+
+$username = trim($_POST['username']);
+$password = $_POST['password'];
+
+// Prepared statement: mencegah SQL injection
+$stmt = $conn->prepare(
+    "SELECT u.iduser, u.username, u.password, r.nama_role
+     FROM user u JOIN role r ON u.idrole = r.idrole
+     WHERE u.username = ?"
+);
+$stmt->bind_param('s', $username);
+$stmt->execute();
+$user = $stmt->get_result()->fetch_assoc();
+
+$valid = false;
+if ($user) {
+    // password_verify: password yang dibuat lewat CRUD user (sudah di-hash)
+    // hash_equals   : password lama yang masih teks biasa (data awal di DML)
+    $valid = password_verify($password, $user['password'])
+          || hash_equals($user['password'], $password);
+}
+
+if ($valid) {
+    session_regenerate_id(true);
+    $_SESSION['iduser']   = $user['iduser'];
+    $_SESSION['username'] = $user['username'];
+    $_SESSION['role']     = $user['nama_role'];
+    redirect('index.php');
+}
+
+echo "<script>alert('Login gagal! Username atau password salah.'); window.location='tampilan_login.php';</script>";
