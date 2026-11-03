@@ -252,6 +252,7 @@ BEGIN
 	RETURN ROUND(p_subtotal*0.11);
 END $$
 
+-- harga jual setelah ppn
 CREATE FUNCTION hitung_harga_jual(p_idbarang INT, p_idmargin INT)
 RETURNS INT
 READS SQL DATA
@@ -266,6 +267,8 @@ BEGIN
     RETURN ROUND(v_harga * (1 + v_persen / 100));
 END $$
 
+
+-- memncari idmargin yang aktif
 CREATE FUNCTION get_idmargin_aktif()
 RETURNS INT
 READS SQL DATA
@@ -287,7 +290,7 @@ CREATE PROCEDURE sp_laporan_stok()
 BEGIN
 	SELECT b.idbarang AS ID, b.Nama AS Barang, s.nama_satuan AS Satuan,
     get_stok(b.idbarang) AS Stok, b.harga AS 'Harga Dasar', 
-    hitung_harga_jual(b.idbarang, get_margin_aktif()) AS 'Harga Jual'
+    hitung_harga_jual(b.idbarang, get_idmargin_aktif()) AS 'Harga Jual'
     FROM barang b
     JOIN satuan s ON b.idsatuan = s.idsatuan
     WHERE b.status = 1
@@ -314,6 +317,9 @@ BEGIN
     IF NEW.jenis NOT IN ('O', 'A') THEN
 		SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jenis barang harus O (Obat) atau A (Alat Kesehatan)';
         END IF;
+	IF NEW.idbarang IS NULL OR NEW.idbarang = 0 THEN
+		SET NEW.idbarang = COALESCE((SELECT MAX(idbarang) FROM barang), 000) +1;
+	END IF;
 END $$
 
 CREATE TRIGGER trg_barang_bu
@@ -348,6 +354,7 @@ BEGIN
 	END IF;
 END $$
 
+-- create id user otomatis
 CREATE TRIGGER trg_user_bi BEFORE INSERT ON user
 FOR EACH ROW
 BEGIN
@@ -355,4 +362,5 @@ BEGIN
         SET NEW.iduser = COALESCE((SELECT MAX(iduser) FROM user), 260500) + 1;
     END IF;
 END$$
+
 DELIMITER ;
