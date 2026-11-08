@@ -3,6 +3,7 @@ $base = '../'; $menu = 'barang';
 require_once $base . 'helpers.php';
 require_login();
 require_role([ROLE_APOTEKER, ROLE_GUDANG]);
+global $conn;
 
 $id   = (int)($_GET['id'] ?? 0);
 $edit = $id > 0;

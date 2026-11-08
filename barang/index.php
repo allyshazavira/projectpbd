@@ -2,6 +2,7 @@
 $base = '../'; $menu = 'barang';
 require_once $base . 'helpers.php';
 require_login();
+global $conn;
 
 $canEdit = has_role([ROLE_APOTEKER, ROLE_GUDANG]);
 $q = trim($_GET['q'] ?? '');
