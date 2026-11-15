@@ -23,9 +23,19 @@ $base = $base ?? '';   // '' untuk file di root, '../' untuk file di dalam folde
         .navbar .user-info { font-size: 14px; margin-right: 20px; }
 
         /* Sidebar Kiri */
-        .sidebar { width: 240px; height: 100vh; background: #00459e; position: fixed; top: 50px; left: 0; padding-top: 20px; box-sizing: border-box; transition: 0.3s ease; z-index: 999; }
+        .sidebar { width: 240px; height: 100vh; background: #00459e; position: fixed; top: 50px; left: 0; padding-top: 20px; box-sizing: border-box; transition: 0.3s ease; z-index: 999; overflow-y: auto; padding-bottom: 70px; }
         .sidebar a { display: block; color: #e6f2ff; padding: 12px 20px; text-decoration: none; transition: 0.2s; font-size: 15px; }
         .sidebar a:hover, .sidebar a.active { background: #007bff; color: white; }
+
+        .sidebar-group summary {
+        color: #FFFDD0; padding: 12px 20px; font-size: 15px; cursor: pointer;
+        list-style: none; display: flex; justify-content: space-between; align-items: center;
+        }
+        .sidebar-group summary::-webkit-details-marker { display: none; }
+        .sidebar-group summary::after { content: '▾'; transition: transform 0.2s; }
+        .sidebar-group[open] summary::after { transform: rotate(180deg); }
+        .sidebar-group summary:hover { background: #007bff; color: white; }
+        .sidebar-group a { padding-left: 36px; background: rgba(0, 0, 0, 0.12); }
 
         /* Konten Utama */
         .main-content { margin-left: 240px; margin-top: 50px; padding: 30px; width: calc(100% - 240px); box-sizing: border-box; transition: 0.3s ease; }
@@ -40,6 +50,7 @@ $base = $base ?? '';   // '' untuk file di root, '../' untuk file di dalam folde
         th { background-color: #f8f9fa; color: #333; font-weight: bold; }
         tr.row-aktif td { background-color: #eaf6ec; }
         .form-card { max-width: 620px; }
+        @media print { .sidebar, .navbar, .no-print { display: none !important; } .main-content { margin: 0; width: 100%; } }
     </style>
 </head>
 <body>
