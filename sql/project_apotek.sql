@@ -186,10 +186,7 @@ use project_apotek;
 
 CREATE OR REPLACE VIEW viewsatuan
 AS SELECT idsatuan AS ID, nama_satuan AS SATUAN,
-	CASE
-		WHEN status = 0 THEN 'Tidak Aktif'
-        ELSE 'Aktif'
-	END AS STATUS
+    CASE WHEN status = 0 THEN 'Tidak Aktif' ELSE 'Aktif' END AS STATUS
 FROM satuan;
 
 CREATE OR REPLACE VIEW viewrole
@@ -202,39 +199,53 @@ JOIN role r ON u.idrole = r.idrole;
 
 CREATE OR REPLACE VIEW viewvendor
 AS SELECT idvendor, nama_vendor, badan_hukum,
-	CASE badan_hukum
-		WHEN 'P' THEN 'PT'
-        WHEN 'C' THEN 'CV'
-	END AS 'Badan Hukum',
-    CASE status
-		WHEN 0 THEN 'Tidak Aktif'
-        ELSE 'Aktif'
-	END AS 'Status'
+    CASE badan_hukum WHEN 'P' THEN 'PT' WHEN 'C' THEN 'CV' END AS 'Badan Hukum',
+    CASE status WHEN 0 THEN 'Tidak Aktif' ELSE 'Aktif' END AS 'Status'
 FROM vendor;
 
 CREATE OR REPLACE VIEW viewmargin
-AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE, 
-	CASE m.status
-		WHEN 0 THEN 'Tidak aktif'
-        ELSE 'Aktif'
-	END AS Status,
-u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at  AS 'Tanggal diubah'
+AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE,
+    CASE m.status WHEN 0 THEN 'Tidak aktif' ELSE 'Aktif' END AS Status,
+    u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at AS 'Tanggal diubah'
 FROM margin_penjualan m
 JOIN user u ON m.iduser = u.iduser;
 
 CREATE OR REPLACE VIEW viewbarang
 AS SELECT b.idbarang AS ID,
-	CASE b.jenis
-		WHEN 'O' THEN 'Obat'
-        WHEN 'A' THEN 'Alat Kesehatan'
-	END AS Kategori,
-    b.nama AS nama_barang, s.nama_satuan AS Satuan, b.harga AS Harga, 
-    CASE b.status
-		WHEN 0 THEN 'Tidak Aktif'
-        ELSE 'Aktif'
-	END AS 'Status'
+    CASE b.jenis WHEN 'O' THEN 'Obat' WHEN 'A' THEN 'Alat Kesehatan' END AS Kategori,
+    b.nama AS nama_barang, s.nama_satuan AS Satuan, b.harga AS Harga,
+    CASE b.status WHEN 0 THEN 'Tidak Aktif' ELSE 'Aktif' END AS 'Status'
 FROM barang b
 JOIN satuan s ON b.idsatuan = s.idsatuan;
+
+CREATE VIEW viewsatuanaktif
+AS SELECT idsatuan AS ID, nama_satuan AS SATUAN, 'Aktif' AS STATUS
+FROM satuan
+WHERE status = 1;
+
+CREATE VIEW viewvendoraktif
+AS SELECT idvendor, nama_vendor, badan_hukum,
+    CASE badan_hukum WHEN 'P' THEN 'PT' WHEN 'C' THEN 'CV' END AS 'Badan Hukum',
+    'Aktif' AS 'Status'
+FROM vendor
+WHERE status = '1';
+
+CREATE VIEW viewmarginaktif
+AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE,
+    'Aktif' AS Status,
+    u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at AS 'Tanggal diubah'
+FROM margin_penjualan m
+JOIN user u ON m.iduser = u.iduser
+WHERE m.status = 1;
+
+CREATE VIEW viewbarangaktif
+AS SELECT b.idbarang AS ID,
+    CASE b.jenis WHEN 'O' THEN 'Obat' WHEN 'A' THEN 'Alat Kesehatan' END AS Kategori,
+    b.nama AS nama_barang, s.nama_satuan AS Satuan, b.harga AS Harga,
+    'Aktif' AS 'Status'
+FROM barang b
+JOIN satuan s ON b.idsatuan = s.idsatuan
+WHERE b.status = 1;
 
 select * from viewbarang
 DELIMITER $$
@@ -364,3 +375,40 @@ BEGIN
 END$$
 
 DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE sp_set_margin(
+	IN p_persen DOUBLE, IN p_iduser INT, OUT p_idmargin INT)
+BEGIN
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN ROLLBACK; RESIGNAL; END;
+    
+    IF NOT EXISTS (SELECT 1 FROM user WHERE iduser = p_iduser AND idrole = 1) THEN
+		SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Hanya Apoteker Penanggung Jawab yang boleh merubah margin';
+	END IF;
+    
+    START TRANSACTION;
+		UPDATE margin_penjualan SET status = 0 WHERE status = 1;
+        SELECT COALESCE(MAX(idmargin_penjualan), 0) + 1 INTO p_idmargin
+        FROM margin_penjualan;
+        INSERT INTO margin_penjualan (idmargin_penjualan, persen, status, iduser)
+        VALUES (p_idmargin, p_persen, 1, p_iduser);
+	COMMIT;
+END //
+
+CREATE TRIGGER trg_margin_bi BEFORE INSERT ON margin_penjualan
+FOR EACH ROW
+BEGIN
+    IF NEW.persen < 0 OR NEW.persen > 100 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Persen margin harus antara 0 - 100';
+    END IF;
+END //
+
+CREATE PROCEDURE sp_kartu_stok(IN p_idbarang INT)
+BEGIN
+    SELECT k.created_at AS Tanggal,
+           CASE k.jenis_transaksi WHEN 'P' THEN 'Penerimaan' WHEN 'J' THEN 'Penjualan' WHEN 'R' THEN 'Retur' END AS Transaksi,
+           k.idtransaksi AS No_Transaksi, k.masuk AS Masuk, k.keluar AS Keluar, k.stock AS Stok
+    FROM kartu_stok k WHERE k.idbarang = p_idbarang ORDER BY k.idkartu_stok;
+END //

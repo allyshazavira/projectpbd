@@ -51,7 +51,7 @@ include $base . 'sidebar.php';
         </thead>
         <tbody>
         <?php if ($result->num_rows === 0) : ?>
-            <tr><td colspan="7" class="text-center text-muted">Belum ada data barang.</td></tr>
+            <tr><td colspan="8" class="text-center text-muted">Belum ada data barang.</td></tr>
         <?php endif; ?>
         <?php while ($row = $result->fetch_assoc()) : ?>
             <tr>
