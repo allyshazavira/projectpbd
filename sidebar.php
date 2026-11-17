@@ -27,11 +27,12 @@ $on = function ($m) use ($menu) { return $menu == $m ? 'active' : ''; };
     <?php endif; ?>
 
     <?php if ($bisaGudang || $bisaKasir) : ?>
-    <details class="sidebar-group" <?= in_array($menu, ['pengadaan', 'penerimaan', 'penjualan']) ? 'open' : '' ?>>
+    <details class="sidebar-group" <?= in_array($menu, ['pengadaan', 'penerimaan', 'retur', 'penjualan']) ? 'open' : '' ?>>
     <summary>Transaksi</summary>
     <?php if ($bisaGudang) : ?>
         <a href="<?= $base ?>pengadaan/index.php" class="<?= $on('pengadaan') ?>">Pengadaan</a>
         <a href="<?= $base ?>penerimaan/index.php" class="<?= $on('penerimaan') ?>">Penerimaan Barang</a>
+        <a href="<?= $base ?>retur/index.php" class="<?= $on('retur') ?>">Retur Barang</a>
     <?php endif; ?>
     <?php if ($bisaKasir) : ?>
         <a href="<?= $base ?>penjualan/index.php" class="<?= $on('penjualan') ?>">Penjualan (Kasir)</a>

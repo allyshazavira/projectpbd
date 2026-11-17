@@ -17,6 +17,7 @@ JOIN satuan s ON b.idsatuan = s.idsatuan
 WHERE b.status = 1;
 
 
+
 DELIMITER //
 DROP FUNCTION get_stok;
 CREATE FUNCTION get_stok(p_idbarang INT)

@@ -54,15 +54,15 @@ BEGIN
     SET p_idpengadaan = LAST_INSERT_ID();
 END //
 
+DELIMITER //
+-- DROP PROCEDURE IF EXISTS sp_tambah_detail_pengadaan;
 CREATE PROCEDURE sp_tambah_detail_pengadaan(
     IN p_idpengadaan BIGINT, IN p_idbarang INT, IN p_jumlah INT)
 BEGIN
     DECLARE v_status CHAR(1);
-    DECLARE v_vendor INT;
     DECLARE v_harga INT;
-    DECLARE v_vendor_barang INT;
 
-    SELECT status, vendor_idvendor INTO v_status, v_vendor
+    SELECT status INTO v_status
     FROM pengadaan WHERE idpengadaan = p_idpengadaan;
 
     IF v_status IS NULL THEN
@@ -79,15 +79,11 @@ BEGIN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jumlah harus lebih dari 0';
     END IF;
 
-    SELECT harga, idvendor INTO v_harga, v_vendor_barang
+    SELECT harga INTO v_harga
     FROM barang WHERE idbarang = p_idbarang AND status = 1;
 
     IF v_harga IS NULL THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Barang tidak ditemukan / tidak aktif';
-    END IF;
-    IF v_vendor_barang <> v_vendor THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Barang ini bukan milik vendor yang dipilih pada pengadaan';
     END IF;
 
     IF EXISTS (SELECT 1 FROM detail_pengadaan

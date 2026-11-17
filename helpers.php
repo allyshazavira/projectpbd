@@ -1,7 +1,7 @@
 <?php
 // helpers.php - dipakai oleh semua halaman CRUD.
 // Isi: session, koneksi database, cek login/role, flash message, CSRF, generator ID.
-include 'DBconnection.php';
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -9,12 +9,7 @@ if (session_status() === PHP_SESSION_NONE) {
 // Supaya error MySQL (termasuk pesan SIGNAL dari trigger) bisa ditangkap dengan try/catch
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
-require_once __DIR__ . '/DBconnection.php';
-if (!isset($conn) || !($conn instanceof mysqli)) {
-    foreach (['koneksi', 'connection', 'db', 'mysqli', 'link'] as $nama) {
-        if (isset($$nama) && $$nama instanceof mysqli) { $conn = $$nama; break; }
-    }
-}   // harus menghasilkan variabel $conn (mysqli)
+require_once __DIR__ . '/DBconnection.php';   // harus menghasilkan variabel $conn (mysqli)
 $conn->set_charset('utf8mb4');
 
 define('ROLE_APOTEKER', 'Apoteker Penanggung Jawab');
@@ -96,4 +91,28 @@ function badge_status($text) {
 
 function rupiah($n) {
     return 'Rp ' . number_format((float)$n, 0, ',', '.');
+}
+
+/* ---------- Tambahan untuk halaman transaksi & laporan ---------- */
+function badge($text, $color = 'secondary') {
+    return '<span class="badge bg-' . h($color) . '">' . h($text) . '</span>';
+}
+
+// Menjalankan stored procedure yang mengembalikan tabel (SELECT).
+// $sql harus sudah aman (angka di-cast int, tanggal divalidasi dengan valid_date()).
+function call_rows(mysqli $conn, $sql) {
+    $rows = [];
+    $conn->multi_query($sql);
+    do {
+        if ($res = $conn->store_result()) {
+            while ($r = $res->fetch_assoc()) $rows[] = $r;
+            $res->free();
+        }
+    } while ($conn->more_results() && $conn->next_result());
+    return $rows;
+}
+
+function valid_date($s, $default) {
+    $d = DateTime::createFromFormat('Y-m-d', (string)$s);
+    return ($d && $d->format('Y-m-d') === $s) ? $s : $default;
 }

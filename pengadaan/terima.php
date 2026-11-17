@@ -5,20 +5,21 @@ require_login();
 require_role([ROLE_APOTEKER, ROLE_GUDANG]);
 global $conn;
 
-$idp = (int)($_POST['idpengadaan'] ?? 0);
+$idp = (int)($_POST['id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
-    $idbarang = (int)($_POST['idbarang'] ?? 0);
-    $jumlah   = (int)($_POST['jumlah'] ?? 0);
+    $iduser = (int)$_SESSION['iduser'];
 
     try {
-        // harga satuan diambil otomatis dari tabel barang oleh procedure/trigger
-        $stmt = $conn->prepare("CALL sp_tambah_detail_pengadaan(?, ?, ?)");
-        $stmt->bind_param('iii', $idp, $idbarang, $jumlah);
+        // Membuat penerimaan berstatus DIPROSES: jumlah -> jumlah_terima, harga -> harga_satuan_terima
+        $stmt = $conn->prepare("CALL sp_terima_pengadaan(?, ?, @idpenerimaan)");
+        $stmt->bind_param('ii', $idp, $iduser);
         $stmt->execute();
         $stmt->close();
-        flash('success', 'Barang ditambahkan ke pengadaan.');
+        $idpn = (int)$conn->query("SELECT @idpenerimaan AS id")->fetch_assoc()['id'];
+        flash('success', "Penerimaan #$idpn dibuat. Periksa harga terima, lalu selesaikan penerimaan.");
+        redirect("../penerimaan/detail.php?id=$idpn");
     } catch (mysqli_sql_exception $e) {
         flash('danger', $e->getMessage());
     }

@@ -5,13 +5,8 @@ require_login();
 require_role([ROLE_APOTEKER, ROLE_KASIR]);
 global $conn;
 
-$validDate = static function ($value, $fallback) {
-    if (!is_string($value)) { return $fallback; }
-    $date = DateTime::createFromFormat('!Y-m-d', $value);
-    return $date && $date->format('Y-m-d') === $value ? $value : $fallback;
-};
-$awal  = $validDate($_GET['awal']  ?? '', date('Y-m-01'));
-$akhir = $validDate($_GET['akhir'] ?? '', date('Y-m-d'));
+$awal  = valid_date($_GET['awal']  ?? '', date('Y-m-01'));
+$akhir = valid_date($_GET['akhir'] ?? '', date('Y-m-d'));
 if ($awal > $akhir) { $tmp = $awal; $awal = $akhir; $akhir = $tmp; }
 
 $q = $conn->prepare("SELECT * FROM viewpenjualan WHERE DATE(Tanggal) BETWEEN ? AND ? ORDER BY Tanggal");

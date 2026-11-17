@@ -7,10 +7,10 @@ global $conn;
 
 $id   = (int)($_GET['id'] ?? 0);
 $edit = $id > 0;
-$data = ['jenis' => 'O', 'nama' => '', 'idsatuan' => '', 'idvendor' => '', 'status' => 1, 'harga' => ''];
+$data = ['jenis' => 'O', 'nama' => '', 'idsatuan' => '', 'status' => 1, 'harga' => ''];
 
 if ($edit) {
-    $stmt = $conn->prepare("SELECT jenis, nama, idsatuan, idvendor, status, harga FROM barang WHERE idbarang = ?");
+    $stmt = $conn->prepare("SELECT jenis, nama, idsatuan, status, harga FROM barang WHERE idbarang = ?");
     $stmt->bind_param('i', $id);
     $stmt->execute();
     $row = $stmt->get_result()->fetch_assoc();
@@ -28,7 +28,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'jenis'    => $_POST['jenis'] ?? '',
         'nama'     => trim($_POST['nama'] ?? ''),
         'idsatuan' => (int)($_POST['idsatuan'] ?? 0),
-        'idvendor' => (int)($_POST['idvendor'] ?? 0),
         'status'   => (int)($_POST['status'] ?? 1),
         'harga'    => (int)($_POST['harga'] ?? 0),
     ];
@@ -36,21 +35,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!in_array($data['jenis'], ['O', 'A'], true)) $errors[] = 'Kategori harus Obat atau Alat Kesehatan.';
     if ($data['nama'] === '' || mb_strlen($data['nama']) > 45) $errors[] = 'Nama barang wajib diisi (maksimal 45 karakter).';
     if ($data['idsatuan'] <= 0) $errors[] = 'Satuan wajib dipilih.';
-    if ($data['idvendor'] <= 0) $errors[] = 'Vendor wajib dipilih.';
     if (!in_array($data['status'], [0, 1], true)) $errors[] = 'Status tidak valid.';
     if ($data['harga'] <= 0) $errors[] = 'Harga dasar harus lebih dari 0.';
 
     if (!$errors) {
         try {
             if ($edit) {
-                $stmt = $conn->prepare("UPDATE barang SET jenis=?, nama=?, idsatuan=?, idvendor=?, status=?, harga=? WHERE idbarang=?");
-                $stmt->bind_param('ssiiiii', $data['jenis'], $data['nama'], $data['idsatuan'], $data['idvendor'], $data['status'], $data['harga'], $id);
+                $stmt = $conn->prepare("UPDATE barang SET jenis=?, nama=?, idsatuan=?, status=?, harga=? WHERE idbarang=?");
+                $stmt->bind_param('ssiiii', $data['jenis'], $data['nama'], $data['idsatuan'], $data['status'], $data['harga'], $id);
                 $stmt->execute();
                 flash('success', 'Barang berhasil diperbarui.');
             } else {
                 $newId = next_id($conn, 'barang', 'idbarang');
-                $stmt = $conn->prepare("INSERT INTO barang (idbarang, jenis, nama, idsatuan, idvendor, status, harga) VALUES (?,?,?,?,?,?,?)");
-                $stmt->bind_param('issiiii', $newId, $data['jenis'], $data['nama'], $data['idsatuan'], $data['idvendor'], $data['status'], $data['harga']);
+                $stmt = $conn->prepare("INSERT INTO barang (idbarang, jenis, nama, idsatuan, status, harga) VALUES (?,?,?,?,?,?)");
+                $stmt->bind_param('issiii', $newId, $data['jenis'], $data['nama'], $data['idsatuan'], $data['status'], $data['harga']);
                 $stmt->execute();
                 flash('success', 'Barang berhasil ditambahkan.');
             }
@@ -61,19 +59,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Dropdown memakai view AKTIF. Saat edit, nilai lama yang sudah nonaktif tetap ditampilkan.
+// Dropdown satuan memakai view AKTIF. Saat edit, satuan lama yang sudah nonaktif tetap ditampilkan.
 $satuan = $conn->query("SELECT ID, SATUAN FROM viewsatuanaktif ORDER BY SATUAN")->fetch_all(MYSQLI_ASSOC);
-$vendor = $conn->query("SELECT idvendor, nama_vendor FROM viewvendoraktif ORDER BY nama_vendor")->fetch_all(MYSQLI_ASSOC);
-
 $idSat = (int)$data['idsatuan'];
 if ($idSat > 0 && !in_array($idSat, array_map('intval', array_column($satuan, 'ID')), true)) {
     $x = $conn->query("SELECT ID, SATUAN FROM viewsatuan WHERE ID = $idSat")->fetch_assoc();
     if ($x) { $x['SATUAN'] .= ' (tidak aktif)'; $satuan[] = $x; }
-}
-$idVen = (int)$data['idvendor'];
-if ($idVen > 0 && !in_array($idVen, array_map('intval', array_column($vendor, 'idvendor')), true)) {
-    $x = $conn->query("SELECT idvendor, nama_vendor FROM viewvendor WHERE idvendor = $idVen")->fetch_assoc();
-    if ($x) { $x['nama_vendor'] .= ' (tidak aktif)'; $vendor[] = $x; }
 }
 
 include $base . 'navbar.php';
@@ -116,17 +107,6 @@ include $base . 'sidebar.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label">Vendor</label>
-                    <select name="idvendor" class="form-select" required>
-                        <option value="">-- Pilih vendor --</option>
-                        <?php foreach ($vendor as $v) : ?>
-                            <option value="<?= (int)$v['idvendor'] ?>" <?= $idVen === (int)$v['idvendor'] ? 'selected' : '' ?>><?= h($v['nama_vendor']) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                    <div class="form-text">Barang hanya bisa dipesan lewat pengadaan ke vendor ini.</div>
                 </div>
 
                 <div class="row">

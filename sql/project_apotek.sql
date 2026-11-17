@@ -184,11 +184,18 @@ INSERT INTO barang (idbarang, jenis, nama, idsatuan, status, harga) VALUES
 (005, 'A', 'Termometer Suhu Digital Box', 2, 1, 25000);
 use project_apotek;
 
+----------- satuan -----------------
 CREATE OR REPLACE VIEW viewsatuan
 AS SELECT idsatuan AS ID, nama_satuan AS SATUAN,
     CASE WHEN status = 0 THEN 'Tidak Aktif' ELSE 'Aktif' END AS STATUS
 FROM satuan;
 
+CREATE OR REPLACE VIEW viewsatuanaktif
+AS SELECT idsatuan AS ID, nama_satuan AS SATUAN, 'Aktif' AS STATUS
+FROM satuan
+WHERE status = 1;
+
+-- ------------- role dan user -----------------
 CREATE OR REPLACE VIEW viewrole
 AS SELECT idrole AS ID, nama_role AS "Nama Role" FROM role;
 
@@ -197,12 +204,21 @@ AS SELECT u.iduser AS ID, u.username AS Username, r.nama_role AS Role
 FROM user u
 JOIN role r ON u.idrole = r.idrole;
 
+-- -------------- vendor ---------------------
 CREATE OR REPLACE VIEW viewvendor
 AS SELECT idvendor, nama_vendor, badan_hukum,
     CASE badan_hukum WHEN 'P' THEN 'PT' WHEN 'C' THEN 'CV' END AS 'Badan Hukum',
     CASE status WHEN 0 THEN 'Tidak Aktif' ELSE 'Aktif' END AS 'Status'
 FROM vendor;
 
+CREATE OR REPLACE VIEW viewvendoraktif
+AS SELECT idvendor, nama_vendor, badan_hukum,
+    CASE badan_hukum WHEN 'P' THEN 'PT' WHEN 'C' THEN 'CV' END AS 'Badan Hukum',
+    'Aktif' AS 'Status'
+FROM vendor
+WHERE status = '1';
+
+-- ----------------- margin -------------------
 CREATE OR REPLACE VIEW viewmargin
 AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE,
     CASE m.status WHEN 0 THEN 'Tidak aktif' ELSE 'Aktif' END AS Status,
@@ -210,6 +226,15 @@ AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE,
 FROM margin_penjualan m
 JOIN user u ON m.iduser = u.iduser;
 
+CREATE OR REPLACE VIEW viewmarginaktif
+AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE,
+    'Aktif' AS Status,
+    u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at AS 'Tanggal diubah'
+FROM margin_penjualan m
+JOIN user u ON m.iduser = u.iduser
+WHERE m.status = 1;
+
+-- -------------- barang ----------------
 CREATE OR REPLACE VIEW viewbarang
 AS SELECT b.idbarang AS ID,
     CASE b.jenis WHEN 'O' THEN 'Obat' WHEN 'A' THEN 'Alat Kesehatan' END AS Kategori,
@@ -218,27 +243,7 @@ AS SELECT b.idbarang AS ID,
 FROM barang b
 JOIN satuan s ON b.idsatuan = s.idsatuan;
 
-CREATE VIEW viewsatuanaktif
-AS SELECT idsatuan AS ID, nama_satuan AS SATUAN, 'Aktif' AS STATUS
-FROM satuan
-WHERE status = 1;
-
-CREATE VIEW viewvendoraktif
-AS SELECT idvendor, nama_vendor, badan_hukum,
-    CASE badan_hukum WHEN 'P' THEN 'PT' WHEN 'C' THEN 'CV' END AS 'Badan Hukum',
-    'Aktif' AS 'Status'
-FROM vendor
-WHERE status = '1';
-
-CREATE VIEW viewmarginaktif
-AS SELECT m.idmargin_penjualan AS ID, m.persen AS PERSENTASE,
-    'Aktif' AS Status,
-    u.username AS 'dibuat oleh', m.created_at AS 'Tanggal dibuat', m.updated_at AS 'Tanggal diubah'
-FROM margin_penjualan m
-JOIN user u ON m.iduser = u.iduser
-WHERE m.status = 1;
-
-CREATE VIEW viewbarangaktif
+CREATE OR REPLACE VIEW viewbarangaktif
 AS SELECT b.idbarang AS ID,
     CASE b.jenis WHEN 'O' THEN 'Obat' WHEN 'A' THEN 'Alat Kesehatan' END AS Kategori,
     b.nama AS nama_barang, s.nama_satuan AS Satuan, b.harga AS Harga,
@@ -412,3 +417,37 @@ BEGIN
            k.idtransaksi AS No_Transaksi, k.masuk AS Masuk, k.keluar AS Keluar, k.stock AS Stok
     FROM kartu_stok k WHERE k.idbarang = p_idbarang ORDER BY k.idkartu_stok;
 END //
+DELIMITER ;
+
+USE PROJECT_APOTEK;
+SET FOREIGN_KEY_CHECKS = 0;
+
+ALTER TABLE PENGADAAN 
+MODIFY IDPENGADAAN BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE DETAIL_PENGADAAN
+MODIFY IDDETAIL_PENGADAAN BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE PENERIMAAN
+MODIFY IDPENERIMAAN BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE DETAIL_PENERIMAAN
+MODIFY IDDETAIL_PENERIMAAN BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE RETU
+MODIFY IDRETUR BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE DETAIL_RETUR
+MODIFY IDDETAIL_RETUR BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE PENJUALAN
+MODIFY IDPENJUALAN bigint NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE DETAIL_PENJUALAN
+MODIFY IDDETAIL_PENJUALAN BIGINT NOT NULL AUTO_INCREMENT;
+
+ALTER TABLE KARTU_STOK
+MODIFY IDKARTU_STOK BIGINT NOT NULL AUTO_INCREMENT;
+
+UPDATE barang SET harga = 3000  WHERE idbarang = 1;
+UPDATE barang SET harga = 7000  WHERE idbarang = 2;

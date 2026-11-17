@@ -21,27 +21,28 @@ JOIN satuan s ON b.idsatuan = s.idsatuan;
 
 
 DELIMITER //
+-- DROP PROCEDURE IF EXISTS sp_posting_penerimaan;
 CREATE PROCEDURE sp_posting_penerimaan(IN p_idpenerimaan BIGINT)
 BEGIN
-	DECLARE v_selesai INT DEFAULT 0;
+    DECLARE v_selesai INT DEFAULT 0;
     DECLARE v_idbarang INT;
     DECLARE v_jumlah INT;
     DECLARE v_harga INT;
     DECLARE cur CURSOR FOR
-		SELECT barang_idbarang, jumlah_terima, harga_satuan_terima
+        SELECT barang_idbarang, jumlah_terima, harga_satuan_terima
         FROM detail_penerimaan WHERE idpenerimaan = p_idpenerimaan
         ORDER BY iddetail_penerimaan;
-	DECLARE CONTINUE HANDLER  FOR NOT FOUND SET v_selesai = 1;
-    
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET v_selesai = 1;
+
     OPEN cur;
     baca: LOOP
-		FETCH cur INTO v_idbarang, v_jumlah, v_harga;
+        FETCH cur INTO v_idbarang, v_jumlah, v_harga;
         IF v_selesai = 1 THEN
-			LEAVE baca;
-		END IF;
+            LEAVE baca;
+        END IF;
         CALL sp_catat_kartu_stok('P', p_idpenerimaan, v_idbarang, v_jumlah, 0);
-        UPDATE barang SET harga = v_harga WHERE idbarang = idbarang;
-	END LOOP;
+        UPDATE barang SET harga = v_harga WHERE idbarang = v_idbarang;
+    END LOOP;
     CLOSE cur;
 END //
 
@@ -146,3 +147,4 @@ BEGIN
     END IF;
     SET NEW.sub_total_terima = hitung_subtotal(NEW.harga_satuan_terima, NEW.jumlah_terima);
 END //
+DELIMITER ;

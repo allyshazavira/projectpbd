@@ -13,15 +13,27 @@ FROM detail_penjualan d
 JOIN barang b ON d.idbarang = b.idbarang
 JOIN satuan s ON b.idsatuan = s.idsatuan;
 
-
+drop function
 CREATE FUNCTION hitung_subtotal(p_harga_satuan INT, p_jumlah INT)
 RETURNS INT 
 DETERMINISTIC NO SQL
 BEGIN
-	RETURN p_harga_satuan*p_jumlah;
+	RETURN p_harga_satuan*p_jumlah
 END //
 
 DELIMITER //
+CREATE PROCEDURE sp_hitung_ulang_penjualan(IN p_idpenjualan INT)
+BEGIN
+    DECLARE v_sub INT;
+    SET v_sub = hitung_subtotal_penjualan(p_idpenjualan);
+
+    UPDATE penjualan
+    SET subtotal_nilai = v_sub,
+        ppn            = hitung_ppn(v_sub),
+        total_nilai    = hitung_total_nilai(v_sub)
+    WHERE idpenjualan = p_idpenjualan;
+END //
+
 CREATE FUNCTION hitung_total_nilai(p_subtotal INT)
 RETURNS INT
 DETERMINISTIC NO SQL

@@ -4,22 +4,7 @@ require_once $base . 'helpers.php';
 require_login();
 global $conn;
 
-if (!function_exists('badge')) {
-    function badge($text, $variant = 'secondary')
-    {
-        $safeText = htmlspecialchars((string)$text, ENT_QUOTES, 'UTF-8');
-        $safeVariant = preg_replace('/[^a-z0-9_-]/i', '', (string)$variant);
-
-        $class = 'bg-' . ($safeVariant !== '' ? $safeVariant : 'secondary');
-        if ($safeVariant === 'warning') {
-            $class = 'bg-warning text-dark';
-        }
-
-        return '<span class="badge ' . $class . '">' . $safeText . '</span>';
-    }
-}
-
-$rows = $conn->query("SELECT * FROM viewstok ORDER BY Barang")->fetch_all(MYSQLI_ASSOC);
+$rows = $conn->query("SELECT * FROM viewstok ORDER BY ID")->fetch_all(MYSQLI_ASSOC);
 $idmargin = $conn->query("SELECT get_idmargin_aktif() AS id")->fetch_assoc()['id'];
 $persen = null;
 if ($idmargin !== null) {

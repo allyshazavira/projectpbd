@@ -32,11 +32,8 @@ $stmt->execute();
 $items = $stmt->get_result();
 
 if ($bolehUbah) {
-    // hanya barang aktif milik vendor pada pengadaan ini
-    $stmt = $conn->prepare("SELECT ID, nama_barang, Satuan, Harga FROM viewbarangaktif WHERE ID_Vendor = ? ORDER BY nama_barang");
-    $stmt->bind_param('i', $p['ID_Vendor']);
-    $stmt->execute();
-    $barang = $stmt->get_result();
+    // semua barang aktif (view aktif)
+    $barang = $conn->query("SELECT ID, nama_barang, Satuan, Harga FROM viewbarangaktif ORDER BY nama_barang");
 }
 
 include $base . 'navbar.php';
@@ -72,7 +69,7 @@ include $base . 'sidebar.php';
     <?php if ($bolehUbah) : ?>
     <div class="card shadow-sm mb-3">
         <div class="card-body">
-            <h6>Tambah barang <span class="text-muted small">(hanya barang dari <?= h($p['Vendor']) ?>)</span></h6>
+            <h6>Tambah barang</h6>
             <form action="tambah_item.php" method="post" class="row g-2 align-items-end">
                 <?= csrf_field() ?>
                 <input type="hidden" name="idpengadaan" value="<?= (int)$p['ID'] ?>">
