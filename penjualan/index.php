@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'penjualan';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_KASIR, ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN, ROLE_KASIR]);
 global $conn;
 
 $result = $conn->query("SELECT * FROM viewpenjualan ORDER BY ID DESC LIMIT 200");

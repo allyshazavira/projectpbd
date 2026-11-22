@@ -48,7 +48,7 @@ include 'sidebar.php';
             </div>
         </div>
 
-        <?php if ($_SESSION['role'] == ROLE_APOTEKER) : ?>
+        <?php if ($_SESSION['role'] == ROLE_SUPERADMIN) : ?>
         <div class="col-md-4">
             <div class="card border-0 shadow-sm h-100 border-warning">
                 <div class="card-body">

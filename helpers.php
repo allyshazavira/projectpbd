@@ -15,6 +15,7 @@ $conn->set_charset('utf8mb4');
 define('ROLE_APOTEKER', 'Apoteker Penanggung Jawab');
 define('ROLE_KASIR',    'Asisten Apoteker / Kasir');
 define('ROLE_GUDANG',   'Petugas Gudang Obat');
+define('ROLE_SUPERADMIN', 'Super Admin');          // boleh mengakses SEMUA halaman
 
 function h($v) {
     return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
@@ -46,7 +47,13 @@ function require_login() {
     }
 }
 
+function is_super_admin() {
+    return ($_SESSION['role'] ?? '') === ROLE_SUPERADMIN;
+}
+
+// Super Admin selalu lolos pemeriksaan role di halaman mana pun
 function has_role(array $roles) {
+    if (is_super_admin()) return true;
     return isset($_SESSION['role']) && in_array($_SESSION['role'], $roles, true);
 }
 

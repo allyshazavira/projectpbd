@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'role';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN]);
 global $conn;
 
 $result = $conn->query("SELECT * FROM viewrole ORDER BY ID");
@@ -25,7 +25,7 @@ include $base . 'sidebar.php';
         </thead>
         <tbody>
         <?php while ($row = $result->fetch_assoc()) : ?>
-            <?php $bawaan = (int)$row['ID'] <= 3; ?>
+            <?php $bawaan = (int)$row['ID'] <= 4; ?>
             <tr>
                 <td><?= h($row['ID']) ?></td>
                 <td><?= h($row['Nama Role']) ?> <?= $bawaan ? '<span class="badge bg-info">Bawaan sistem</span>' : '' ?></td>

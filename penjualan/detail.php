@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'penjualan';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER, ROLE_KASIR]);
+require_role([ROLE_SUPERADMIN, ROLE_KASIR]);
 global $conn;
 
 $id = (int)($_GET['id'] ?? 0);

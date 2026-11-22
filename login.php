@@ -1,5 +1,6 @@
 <?php
 require_once 'helpers.php';
+global $conn;
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !isset($_POST['username'], $_POST['password'])) {
     redirect('tampilan_login.php');

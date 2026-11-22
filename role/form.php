@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'role';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN]);
 global $conn;
 
 $id   = (int)($_GET['id'] ?? 0);
@@ -10,7 +10,7 @@ $edit = $id > 0;
 $data = ['nama_role' => ''];
 
 if ($edit) {
-    if ($id <= 3) {   // role bawaan dipakai untuk hak akses di aplikasi
+    if ($id <= 4) {   // role bawaan (1-3 + Super Admin) dipakai untuk hak akses di aplikasi
         flash('warning', 'Role bawaan sistem tidak boleh diubah.');
         redirect('index.php');
     }

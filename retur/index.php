@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'retur';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER, ROLE_GUDANG]);
+require_role([ROLE_SUPERADMIN, ROLE_GUDANG]);
 global $conn;
 
 $result = $conn->query("SELECT * FROM viewretur ORDER BY ID DESC");

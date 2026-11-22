@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'user';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN]);
 global $conn;
 
 $id   = (int)($_GET['id'] ?? 0);
@@ -19,7 +19,24 @@ if ($edit) {
         redirect('index.php');
     }
     $data = $row;
+
+    // Akun Super Admin hanya boleh diubah oleh Super Admin
+    $rn = $conn->prepare("SELECT r.nama_role FROM user u JOIN role r ON u.idrole = r.idrole WHERE u.iduser = ?");
+    $rn->bind_param('i', $id);
+    $rn->execute();
+    $targetRole = $rn->get_result()->fetch_assoc()['nama_role'] ?? '';
+    if ($targetRole === ROLE_SUPERADMIN && !is_super_admin()) {
+        flash('warning', 'Akun Super Admin hanya bisa diubah oleh Super Admin.');
+        redirect('index.php');
+    }
 }
+
+// Daftar role di dropdown. Role Super Admin hanya bisa diberikan oleh Super Admin.
+$daftarRole = $conn->query("SELECT idrole, nama_role FROM role ORDER BY idrole")->fetch_all(MYSQLI_ASSOC);
+if (!is_super_admin()) {
+    $daftarRole = array_values(array_filter($daftarRole, fn($r) => $r['nama_role'] !== ROLE_SUPERADMIN));
+}
+$idRoleBoleh = array_map('intval', array_column($daftarRole, 'idrole'));
 
 $errors = [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -32,6 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($data['username'] === '' || mb_strlen($data['username']) > 45) $errors[] = 'Username wajib diisi (maksimal 45 karakter).';
     if ($data['idrole'] <= 0) $errors[] = 'Role wajib dipilih.';
+    elseif (!in_array($data['idrole'], $idRoleBoleh, true)) $errors[] = 'Anda tidak berhak memberikan role tersebut.';
     if (!$edit && $password === '') $errors[] = 'Password wajib diisi.';
     if ($password !== '' && mb_strlen($password) < 6) $errors[] = 'Password minimal 6 karakter.';
 
@@ -80,7 +98,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$roles = $conn->query("SELECT idrole, nama_role FROM role ORDER BY idrole");
 
 include $base . 'navbar.php';
 include $base . 'sidebar.php';
@@ -118,11 +135,11 @@ include $base . 'sidebar.php';
                     <label class="form-label">Role</label>
                     <select name="idrole" class="form-select" required>
                         <option value="">-- Pilih role --</option>
-                        <?php while ($r = $roles->fetch_assoc()) : ?>
+                        <?php foreach ($daftarRole as $r) : ?>
                             <option value="<?= (int)$r['idrole'] ?>" <?= (int)$data['idrole'] === (int)$r['idrole'] ? 'selected' : '' ?>>
                                 <?= h($r['nama_role']) ?>
                             </option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <button class="btn btn-primary">Simpan</button>

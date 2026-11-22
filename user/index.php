@@ -2,7 +2,7 @@
 $base = '../'; $menu = 'user';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN]);
 global $conn;
 
 $result = $conn->query("SELECT * FROM viewuser ORDER BY ID");
@@ -25,12 +25,15 @@ include $base . 'sidebar.php';
         </thead>
         <tbody>
         <?php while ($row = $result->fetch_assoc()) : ?>
-            <?php $self = (int)$row['ID'] === (int)$_SESSION['iduser']; ?>
+            <?php $self = (int)$row['ID'] === (int)$_SESSION['iduser']; $terkunci = ($row['Role'] === ROLE_SUPERADMIN && !is_super_admin()); ?>
             <tr>
                 <td><?= h($row['ID']) ?></td>
                 <td><?= h($row['Username']) ?> <?= $self ? '<span class="badge bg-primary">Anda</span>' : '' ?></td>
                 <td><?= h($row['Role']) ?></td>
                 <td>
+                    <?php if ($terkunci) : ?>
+                        <span class="text-muted small">Hanya Super Admin</span>
+                    <?php else : ?>
                     <a href="form.php?id=<?= (int)$row['ID'] ?>" class="btn btn-sm btn-outline-warning">Ubah</a>
                     <?php if (!$self) : ?>
                     <form action="hapus.php" method="post" class="d-inline"
@@ -39,6 +42,7 @@ include $base . 'sidebar.php';
                         <input type="hidden" name="id" value="<?= (int)$row['ID'] ?>">
                         <button class="btn btn-sm btn-outline-danger">Hapus</button>
                     </form>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </td>
             </tr>
