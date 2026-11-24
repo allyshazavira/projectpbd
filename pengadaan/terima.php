@@ -18,7 +18,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute();
         $stmt->close();
         $idpn = (int)$conn->query("SELECT @idpenerimaan AS id")->fetch_assoc()['id'];
-        flash('success', "Penerimaan #$idpn dibuat. Periksa harga terima, lalu selesaikan penerimaan.");
+        flash('success', "Penerimaan #$idpn dibuat. Isi jumlah yang diterima dan harga terima, lalu selesaikan penerimaan.");
         redirect("../penerimaan/detail.php?id=$idpn");
     } catch (mysqli_sql_exception $e) {
         flash('danger', $e->getMessage());

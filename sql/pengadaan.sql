@@ -5,15 +5,27 @@ AS SELECT p.idpengadaan AS ID, p.timestamp AS Tanggal,
     v.nama_vendor AS Vendor, u.username AS Dibuat_oleh,
     p.subtotal_nilai AS Subtotal, p.ppn AS PPN, p.total_nilai AS Total,
     CASE p.status WHEN 'P' THEN 'Diproses' WHEN 'S' THEN 'Selesai' ELSE p.status END AS Status,
-    p.vendor_idvendor AS ID_Vendor
+    p.vendor_idvendor AS ID_Vendor,
+    hitung_sisa_pengadaan(p.idpengadaan) AS Sisa_Barang,
+    -- jumlah yang sudah diisi di penerimaan berstatus Diproses (belum final, belum mengurangi sisa)
+    (SELECT COALESCE(SUM(dp.jumlah_terima), 0) FROM detail_penerimaan dp
+     JOIN penerimaan pn ON dp.idpenerimaan = pn.idpenerimaan
+     WHERE pn.idpengadaan = p.idpengadaan AND pn.status = 'P') AS Sedang_Diproses
 FROM pengadaan p
 JOIN vendor v ON p.vendor_idvendor = v.idvendor
 JOIN user u ON p.user_iduser = u.iduser;
 
+-- Jumlah_Diterima & Sisa dihitung dari penerimaan yang sudah SELESAI
 CREATE OR REPLACE VIEW viewdetailpengadaan
 AS SELECT d.idpengadaan AS ID_Pengadaan, d.iddetail_pengadaan AS ID_Detail,
     b.nama AS Barang, s.nama_satuan AS Satuan,
-    d.harga_satuan AS Harga_Satuan, d.jumlah AS Jumlah, d.sub_total AS Subtotal
+    d.harga_satuan AS Harga_Satuan, d.jumlah AS Jumlah, d.sub_total AS Subtotal,
+    d.jumlah - hitung_sisa_barang(d.idpengadaan, d.idbarang, 0) AS Jumlah_Diterima,
+    hitung_sisa_barang(d.idpengadaan, d.idbarang, 0) AS Sisa,
+    (SELECT COALESCE(SUM(dp.jumlah_terima), 0) FROM detail_penerimaan dp
+     JOIN penerimaan pn ON dp.idpenerimaan = pn.idpenerimaan
+     WHERE pn.idpengadaan = d.idpengadaan AND pn.status = 'P'
+       AND dp.barang_idbarang = d.idbarang) AS Sedang_Diproses
 FROM detail_pengadaan d
 JOIN barang b ON d.idbarang = b.idbarang
 JOIN satuan s ON b.idsatuan = s.idsatuan;
@@ -137,3 +149,55 @@ FOR EACH ROW
 BEGIN
     CALL sp_hitung_ulang_pengadaan(OLD.idpengadaan);
 END //
+DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION hitung_sisa_pengadaan(p_idpengadaan BIGINT)
+RETURNS INT
+READS SQL DATA
+BEGIN
+    RETURN COALESCE((SELECT SUM(hitung_sisa_barang(d.idpengadaan, d.idbarang, 0))
+                     FROM detail_pengadaan d
+                     WHERE d.idpengadaan = p_idpengadaan), 0);
+END //
+
+CREATE PROCEDURE sp_terima_pengadaan(
+    IN p_idpengadaan BIGINT, IN p_iduser INT, OUT p_idpenerimaan BIGINT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN ROLLBACK; RESIGNAL; END;
+
+    IF NOT EXISTS (SELECT 1 FROM pengadaan WHERE idpengadaan = p_idpengadaan AND status = 'P') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Pengadaan tidak ditemukan atau sudah selesai';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM detail_pengadaan WHERE idpengadaan = p_idpengadaan) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Pengadaan belum memiliki detail barang';
+    END IF;
+    IF EXISTS (SELECT 1 FROM penerimaan WHERE idpengadaan = p_idpengadaan AND status = 'P') THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Masih ada penerimaan yang belum diselesaikan pada pengadaan ini';
+    END IF;
+    IF hitung_sisa_pengadaan(p_idpengadaan) <= 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Semua barang pada pengadaan ini sudah diterima';
+    END IF;
+
+    START TRANSACTION;
+        INSERT INTO penerimaan (status, idpengadaan, iduser)
+        VALUES ('P', p_idpengadaan, p_iduser);
+        SET p_idpenerimaan = LAST_INSERT_ID();
+
+        INSERT INTO detail_penerimaan
+            (idpenerimaan, barang_idbarang, jumlah_terima, harga_satuan_terima, sub_total_terima)
+        SELECT p_idpenerimaan, d.idbarang, hitung_sisa_barang(d.idpengadaan, d.idbarang, 0),
+               d.harga_satuan, 0
+        FROM detail_pengadaan d
+        WHERE d.idpengadaan = p_idpengadaan
+          AND hitung_sisa_barang(d.idpengadaan, d.idbarang, 0) > 0
+        ORDER BY d.iddetail_pengadaan;   -- sub_total_terima dihitung ulang oleh trigger
+    COMMIT;
+END //
+
+
+DELIMITER ;

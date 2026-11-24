@@ -15,7 +15,7 @@ $items = [];
 if ($idpn > 0) {
     $stmt = $conn->prepare(
         "SELECT v.*, COALESCE((SELECT SUM(dr.jumlah) FROM detail_retur dr WHERE dr.iddetail_penerimaan = v.ID_Detail), 0) AS Sudah_Retur
-         FROM viewdetailpenerimaan v WHERE v.ID_Penerimaan = ? ORDER BY v.ID_Detail");
+         FROM viewdetailpenerimaan v WHERE v.ID_Penerimaan = ? AND v.Jumlah_Terima > 0 ORDER BY v.ID_Detail");
     $stmt->bind_param('i', $idpn);
     $stmt->execute();
     $items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);

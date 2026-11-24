@@ -17,22 +17,26 @@ if (!$p) {
 }
 $proses = $p['Status'] === 'Diproses';
 
-// Penerimaan milik pengadaan ini (kalau sudah dibuat)
-$stmt = $conn->prepare("SELECT ID, Status FROM viewpenerimaan WHERE ID_Pengadaan = ?");
+// Semua penerimaan (pengiriman) milik pengadaan ini
+$stmt = $conn->prepare("SELECT ID, Tanggal, Total, Status FROM viewpenerimaan WHERE ID_Pengadaan = ? ORDER BY ID");
 $stmt->bind_param('i', $id);
 $stmt->execute();
-$pn = $stmt->get_result()->fetch_assoc();
-
-// Barang hanya boleh diubah selama diproses dan belum ada penerimaan
-$bolehUbah = $proses && !$pn;
+$penerimaan = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$adaTerbuka = false;
+foreach ($penerimaan as $r) { if ($r['Status'] === 'Diproses') $adaTerbuka = true; }
 
 $stmt = $conn->prepare("SELECT * FROM viewdetailpengadaan WHERE ID_Pengadaan = ? ORDER BY ID_Detail");
 $stmt->bind_param('i', $id);
 $stmt->execute();
-$items = $stmt->get_result();
+$items = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+
+$sisaTotal  = (int)$p['Sisa_Barang'];
+// Barang hanya boleh diubah selama diproses dan belum pernah ada penerimaan
+$bolehUbah  = $proses && !$penerimaan;
+// Penerimaan baru: masih ada sisa, dan tidak ada penerimaan lain yang belum diselesaikan
+$bolehTerima = $proses && $items && !$adaTerbuka && $sisaTotal > 0;
 
 if ($bolehUbah) {
-    // semua barang aktif (view aktif)
     $barang = $conn->query("SELECT ID, nama_barang, Satuan, Harga FROM viewbarangaktif ORDER BY nama_barang");
 }
 
@@ -54,17 +58,10 @@ include $base . 'sidebar.php';
             <div class="col-md-3"><div class="text-muted small">Tanggal</div><?= h($p['Tanggal']) ?></div>
             <div class="col-md-3"><div class="text-muted small">Dibuat oleh</div><?= h($p['Dibuat_oleh']) ?></div>
             <div class="col-md-3"><div class="text-muted small">Status</div>
-                <?= $proses ? badge('Diproses', 'warning') : badge('Selesai', 'success') ?></div>
+                <?= $proses ? badge('Diproses', 'warning') : badge('Selesai', 'success') ?>
+                <?php if ($proses && $penerimaan) : ?><span class="small text-muted">sisa <?= $sisaTotal ?> belum diterima<?= (int)$p['Sedang_Diproses'] > 0 ? ', ' . (int)$p['Sedang_Diproses'] . ' sedang diproses' : '' ?></span><?php endif; ?></div>
         </div>
     </div>
-
-    <?php if ($pn) : ?>
-        <div class="alert alert-info py-2">
-            Barang sudah diterima di
-            <a href="../penerimaan/detail.php?id=<?= (int)$pn['ID'] ?>">Penerimaan #<?= (int)$pn['ID'] ?></a>
-            (<?= h($pn['Status']) ?>).
-        </div>
-    <?php endif; ?>
 
     <?php if ($bolehUbah) : ?>
     <div class="card shadow-sm mb-3">
@@ -96,19 +93,22 @@ include $base . 'sidebar.php';
 
     <table>
         <thead>
-            <tr><th>Barang</th><th>Satuan</th><th>Harga Satuan</th><th>Jumlah</th><th>Subtotal</th>
+            <tr><th>Barang</th><th>Satuan</th><th>Harga Satuan</th><th>Dipesan</th><th>Sudah Diterima</th><th>Sedang Diproses</th><th>Sisa</th><th>Subtotal</th>
                 <?php if ($bolehUbah) : ?><th style="width:90px">Aksi</th><?php endif; ?></tr>
         </thead>
         <tbody>
-        <?php if ($items->num_rows === 0) : ?>
-            <tr><td colspan="6" class="text-center text-muted">Belum ada barang di pengadaan ini.</td></tr>
+        <?php if (!$items) : ?>
+            <tr><td colspan="9" class="text-center text-muted">Belum ada barang di pengadaan ini.</td></tr>
         <?php endif; ?>
-        <?php while ($d = $items->fetch_assoc()) : ?>
+        <?php foreach ($items as $d) : ?>
             <tr>
                 <td><?= h($d['Barang']) ?></td>
                 <td><?= h($d['Satuan']) ?></td>
                 <td><?= rupiah($d['Harga_Satuan']) ?></td>
                 <td><?= (int)$d['Jumlah'] ?></td>
+                <td><?= (int)$d['Jumlah_Diterima'] ?></td>
+                <td><?= (int)$d['Sedang_Diproses'] > 0 ? '<span class="text-warning-emphasis">' . (int)$d['Sedang_Diproses'] . '</span>' : '0' ?></td>
+                <td><?= (int)$d['Sisa'] === 0 ? badge('Lengkap', 'success') : '<b>' . (int)$d['Sisa'] . '</b>' ?></td>
                 <td><?= rupiah($d['Subtotal']) ?></td>
                 <?php if ($bolehUbah) : ?>
                 <td>
@@ -121,29 +121,52 @@ include $base . 'sidebar.php';
                 </td>
                 <?php endif; ?>
             </tr>
-        <?php endwhile; ?>
+        <?php endforeach; ?>
         </tbody>
         <tfoot>
-            <tr><td colspan="4" class="text-end">Subtotal</td><td><?= rupiah($p['Subtotal']) ?></td><?= $bolehUbah ? '<td></td>' : '' ?></tr>
-            <tr><td colspan="4" class="text-end">PPN 11%</td><td><?= rupiah($p['PPN']) ?></td><?= $bolehUbah ? '<td></td>' : '' ?></tr>
-            <tr><td colspan="4" class="text-end"><b>Total</b></td><td><b><?= rupiah($p['Total']) ?></b></td><?= $bolehUbah ? '<td></td>' : '' ?></tr>
+            <tr><td colspan="7" class="text-end">Subtotal</td><td><?= rupiah($p['Subtotal']) ?></td><?= $bolehUbah ? '<td></td>' : '' ?></tr>
+            <tr><td colspan="7" class="text-end">PPN 11%</td><td><?= rupiah($p['PPN']) ?></td><?= $bolehUbah ? '<td></td>' : '' ?></tr>
+            <tr><td colspan="7" class="text-end"><b>Total</b></td><td><b><?= rupiah($p['Total']) ?></b></td><?= $bolehUbah ? '<td></td>' : '' ?></tr>
         </tfoot>
     </table>
 
-    <?php if ($bolehUbah) : ?>
-    <div class="mt-3 d-flex gap-2">
+    <?php if ($penerimaan) : ?>
+    <h6 class="mt-4">Penerimaan barang</h6>
+    <table>
+        <thead><tr><th>No</th><th>Tanggal</th><th>Nilai Diterima</th><th>Status</th><th style="width:100px">Aksi</th></tr></thead>
+        <tbody>
+        <?php foreach ($penerimaan as $r) : ?>
+            <tr>
+                <td>#<?= (int)$r['ID'] ?></td>
+                <td><?= h($r['Tanggal']) ?></td>
+                <td><?= rupiah($r['Total']) ?></td>
+                <td><?= $r['Status'] === 'Selesai' ? badge('Selesai', 'success') : badge('Diproses', 'warning') ?></td>
+                <td><a href="../penerimaan/detail.php?id=<?= (int)$r['ID'] ?>" class="btn btn-sm btn-outline-primary">Buka</a></td>
+            </tr>
+        <?php endforeach; ?>
+        </tbody>
+    </table>
+    <?php endif; ?>
+
+    <div class="mt-3 d-flex gap-2 align-items-center">
+        <?php if ($bolehTerima) : ?>
         <form action="terima.php" method="post"
-              onsubmit="return confirm('Buat penerimaan dari pengadaan ini? Barang di pengadaan tidak bisa diubah lagi.')">
+              onsubmit="return confirm('Buat penerimaan baru? Isi awalnya adalah sisa barang yang belum diterima.')">
             <?= csrf_field() ?>
             <input type="hidden" name="id" value="<?= (int)$p['ID'] ?>">
-            <button class="btn btn-success" <?= $items->num_rows === 0 ? 'disabled' : '' ?>>Terima Barang</button>
+            <button class="btn btn-success"><?= $penerimaan ? 'Terima Sisa Barang' : 'Terima Barang' ?></button>
         </form>
+        <?php elseif ($proses && $adaTerbuka) : ?>
+            <span class="text-muted small">Sisa baru berkurang setelah penerimaan yang sedang diproses <b>diselesaikan</b>.</span>
+        <?php endif; ?>
+
+        <?php if ($bolehUbah) : ?>
         <form action="hapus.php" method="post" onsubmit="return confirm('Batalkan dan hapus pengadaan ini?')">
             <?= csrf_field() ?>
             <input type="hidden" name="id" value="<?= (int)$p['ID'] ?>">
             <button class="btn btn-outline-danger">Hapus Pengadaan</button>
         </form>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 </div>
 <?php include $base . 'footer.php'; ?>

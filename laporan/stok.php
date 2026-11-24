@@ -45,7 +45,7 @@ include $base . 'sidebar.php';
                 <td>
                     <?php if ($stok <= 0) echo badge('Habis', 'danger');
                           elseif ($stok <= $batas) echo badge($stok, 'warning');
-                          else echo $stok; ?>
+                          else echo ($stok); ?>
                 </td>
                 <td><?= rupiah($r['Harga_Dasar']) ?></td>
                 <td><?= rupiah($r['Harga_Jual']) ?></td>

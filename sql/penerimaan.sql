@@ -10,12 +10,18 @@ JOIN pengadaan pg ON pn.idpengadaan = pg.idpengadaan
 JOIN vendor v ON pg.vendor_idvendor = v.idvendor
 JOIN user u ON pn.iduser = u.iduser;
 
+-- Dipesan  = jumlah di pengadaan
+-- Sisa_Sebelum = sisa SEBELUM penerimaan ini (sudah dikurangi penerimaan selesai sebelumnya)
 CREATE OR REPLACE VIEW viewdetailpenerimaan
 AS SELECT dp.idpenerimaan AS ID_Penerimaan, dp.iddetail_penerimaan AS ID_Detail,
     b.nama AS Barang, s.nama_satuan AS Satuan,
     dp.jumlah_terima AS Jumlah_Terima, dp.harga_satuan_terima AS Harga_Satuan,
-    dp.sub_total_terima AS Subtotal
+    dp.sub_total_terima AS Subtotal,
+    (SELECT COALESCE(SUM(g.jumlah), 0) FROM detail_pengadaan g
+     WHERE g.idpengadaan = pn.idpengadaan AND g.idbarang = dp.barang_idbarang) AS Dipesan,
+    hitung_sisa_barang(pn.idpengadaan, dp.barang_idbarang, dp.idpenerimaan) AS Sisa_Sebelum
 FROM detail_penerimaan dp
+JOIN penerimaan pn ON dp.idpenerimaan = pn.idpenerimaan
 JOIN barang b ON dp.barang_idbarang = b.idbarang
 JOIN satuan s ON b.idsatuan = s.idsatuan;
 
@@ -45,7 +51,8 @@ BEGIN
     END LOOP;
     CLOSE cur;
 END //
-
+describe detail_pengadaan;
+SHOW CREATE PROCEDURE sp_hitung_ulang_pengadaan
 CREATE PROCEDURE sp_terima_pengadaan(
     IN p_idpengadaan BIGINT, IN p_iduser INT, OUT p_idpenerimaan BIGINT)
 BEGIN
@@ -88,6 +95,8 @@ BEGIN
     WHERE iddetail_penerimaan = p_iddetail;      -- trigger: cek status, hitung ulang subtotal
 END //
 
+DROP PROCEDURE sp_selesaikan_penerimaan;
+DELIMITER //
 CREATE PROCEDURE sp_selesaikan_penerimaan(IN p_idpenerimaan BIGINT)
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM penerimaan WHERE idpenerimaan = p_idpenerimaan) THEN
@@ -100,6 +109,7 @@ BEGIN
     UPDATE penerimaan SET status = 'S' WHERE idpenerimaan = p_idpenerimaan;
 END //
 
+DELIMITER //
 CREATE TRIGGER trg_penerimaan_bu BEFORE UPDATE ON penerimaan
 FOR EACH ROW
 BEGIN
@@ -109,42 +119,113 @@ BEGIN
     IF OLD.status = 'S' AND NEW.status <> 'S' THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Penerimaan yang sudah selesai tidak bisa dibuka lagi';
     END IF;
+    IF OLD.status = 'P' AND NEW.status = 'S'
+       AND COALESCE((SELECT SUM(jumlah_terima) FROM detail_penerimaan
+                     WHERE idpenerimaan = OLD.idpenerimaan), 0) = 0 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Isi jumlah diterima minimal untuk satu barang sebelum menyelesaikan penerimaan';
+    END IF;
 END //
 
+DELIMITER //
 CREATE TRIGGER trg_penerimaan_au AFTER UPDATE ON penerimaan
 FOR EACH ROW
 BEGIN
     IF OLD.status = 'P' AND NEW.status = 'S' THEN
         UPDATE pengadaan SET status = 'S' WHERE idpengadaan = NEW.idpengadaan;   -- sinkron
-        CALL sp_posting_penerimaan(NEW.idpenerimaan);                            -- stok + harga barang
+        CALL sp_posting_penerimaan(NEW.idpenerimaan);  -- stok + harga barang
+        IF hitung_sisa_pengadaan(NEW.idpengadaan) = 0 THEN
+            UPDATE pengadaan SET status = 'S' WHERE idpengadaan = NEW.idpengadaan;
+        END IF;
     END IF;
 END //
 
+DROP TRIGGER IF EXISTS trg_detail_penerimaan_bi;
+DELIMITER //
 CREATE TRIGGER trg_detail_penerimaan_bi BEFORE INSERT ON detail_penerimaan
 FOR EACH ROW
 BEGIN
-    IF NEW.jumlah_terima <= 0 THEN
-        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jumlah terima harus lebih dari 0';
+    DECLARE v_idpengadaan BIGINT;
+
+    IF NEW.jumlah_terima < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jumlah terima tidak boleh negatif';
     END IF;
     IF NEW.harga_satuan_terima <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga satuan terima harus lebih dari 0';
     END IF;
-    SET NEW.sub_total_terima = hitung_subtotal(NEW.harga_satuan_terima, NEW.jumlah_terima);
+
+    SELECT idpengadaan INTO v_idpengadaan FROM penerimaan WHERE idpenerimaan = NEW.idpenerimaan;
+    IF NEW.jumlah_terima > hitung_sisa_barang(v_idpengadaan, NEW.barang_idbarang, NEW.idpenerimaan) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jumlah diterima melebihi sisa pesanan';
+    END IF;
+
+    IF NEW.jumlah_terima = 0 THEN
+        SET NEW.sub_total_terima = 0;
+    ELSE
+        SET NEW.sub_total_terima = hitung_subtotal(NEW.harga_satuan_terima, NEW.jumlah_terima);
+    END IF;
 END //
 
+DELIMITER //
 CREATE TRIGGER trg_detail_penerimaan_bu BEFORE UPDATE ON detail_penerimaan
 FOR EACH ROW
 BEGIN
     DECLARE v_status CHAR(1);
+    DECLARE v_idpengadaan BIGINT;
 
-    SELECT status INTO v_status FROM penerimaan WHERE idpenerimaan = OLD.idpenerimaan;
+    SELECT status, idpengadaan INTO v_status, v_idpengadaan
+    FROM penerimaan WHERE idpenerimaan = OLD.idpenerimaan;
+
     IF v_status = 'S' THEN
         SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Penerimaan sudah selesai, harga terima tidak bisa diubah';
+        SET MESSAGE_TEXT = 'Penerimaan sudah selesai, data tidak bisa diubah';
+    END IF;
+    IF NEW.jumlah_terima < 0 THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jumlah terima tidak boleh negatif';
     END IF;
     IF NEW.harga_satuan_terima <= 0 THEN
         SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Harga satuan terima harus lebih dari 0';
     END IF;
-    SET NEW.sub_total_terima = hitung_subtotal(NEW.harga_satuan_terima, NEW.jumlah_terima);
+    IF NEW.jumlah_terima > hitung_sisa_barang(v_idpengadaan, OLD.barang_idbarang, OLD.idpenerimaan) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Jumlah diterima melebihi sisa pesanan';
+    END IF;
+
+    IF NEW.jumlah_terima = 0 THEN
+        SET NEW.sub_total_terima = 0;
+    ELSE
+        SET NEW.sub_total_terima = hitung_subtotal(NEW.harga_satuan_terima, NEW.jumlah_terima);
+    END IF;
 END //
 DELIMITER ;
+
+DELIMITER //
+CREATE FUNCTION hitung_sisa_barang(
+    p_idpengadaan BIGINT, p_idbarang INT, p_sebelum_idpenerimaan BIGINT)
+RETURNS INT
+READS SQL DATA
+BEGIN
+    RETURN COALESCE((SELECT SUM(jumlah) FROM detail_pengadaan
+                     WHERE idpengadaan = p_idpengadaan AND idbarang = p_idbarang), 0)
+         - COALESCE((SELECT SUM(dp.jumlah_terima)
+                     FROM detail_penerimaan dp
+                     JOIN penerimaan pn ON dp.idpenerimaan = pn.idpenerimaan
+                     WHERE pn.idpengadaan = p_idpengadaan
+                       AND pn.status = 'S'
+                       AND dp.barang_idbarang = p_idbarang
+                       AND (p_sebelum_idpenerimaan = 0 OR dp.idpenerimaan < p_sebelum_idpenerimaan)), 0);
+END//
+
+DELIMITER //
+CREATE PROCEDURE sp_ubah_detail_penerimaan(
+    IN p_iddetail BIGINT, IN p_jumlah INT, IN p_harga INT)
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM detail_penerimaan WHERE iddetail_penerimaan = p_iddetail) THEN
+        SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Detail penerimaan tidak ditemukan';
+    END IF;
+
+    UPDATE detail_penerimaan
+    SET jumlah_terima = p_jumlah, harga_satuan_terima = p_harga
+    WHERE iddetail_penerimaan = p_iddetail;   -- trigger: cek status, batas sisa, subtotal
+END //
+
+show triggers

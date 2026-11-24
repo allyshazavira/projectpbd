@@ -9,21 +9,24 @@ $id = (int)($_POST['id'] ?? 0);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
-    $harga = $_POST['harga'] ?? [];
+    $jumlah = $_POST['jumlah'] ?? [];
+    $harga  = $_POST['harga'] ?? [];
 
     try {
         $conn->begin_transaction();
         foreach ($harga as $iddetail => $h) {
+            if (!isset($jumlah[$iddetail])) continue;
             $iddetail = (int)$iddetail;
+            $j = (int)$jumlah[$iddetail];
             $h = (int)$h;
-            // trigger memeriksa status penerimaan, validasi harga, dan menghitung ulang subtotal
-            $stmt = $conn->prepare("CALL sp_ubah_harga_terima(?, ?)");
-            $stmt->bind_param('ii', $iddetail, $h);
+            // trigger: cek status, batas sisa pesanan, validasi harga, hitung ulang subtotal
+            $stmt = $conn->prepare("CALL sp_ubah_detail_penerimaan(?, ?, ?)");
+            $stmt->bind_param('iii', $iddetail, $j, $h);
             $stmt->execute();
             $stmt->close();
         }
         $conn->commit();
-        flash('success', 'Harga satuan terima berhasil disimpan.');
+        flash('success', 'Jumlah dan harga terima berhasil disimpan.');
     } catch (mysqli_sql_exception $e) {
         $conn->rollback();
         flash('danger', $e->getMessage());
