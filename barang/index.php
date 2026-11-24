@@ -7,15 +7,30 @@ global $conn;
 $canEdit = has_role([ROLE_APOTEKER, ROLE_GUDANG]);
 $q = trim($_GET['q'] ?? '');
 
+$status = $_GET['status'] ?? 'Aktif';
+$q = trim($_GET['q'] ?? '');
+
+if ($status == 'Aktif') {
+    $query = "SELECT * FROM viewbarangaktif";
+} else {
+    $query = "SELECT * FROM viewbarang";
+}
+
 if ($q !== '') {
-    $stmt = $conn->prepare("SELECT * FROM viewbarang WHERE nama_barang LIKE ? ORDER BY ID");
+    $query .= " WHERE nama_barang LIKE ?";
+}
+
+$query .= " ORDER BY ID ASC";
+
+$stmt = $conn->prepare($query);
+
+if ($q !== '') {
     $like = "%$q%";
     $stmt->bind_param('s', $like);
-    $stmt->execute();
-    $result = $stmt->get_result();
-} else {
-    $result = $conn->query("SELECT * FROM viewbarang ORDER BY ID");
 }
+
+$stmt->execute();
+$result = $stmt->get_result();
 
 include $base . 'navbar.php';
 include $base . 'sidebar.php';
@@ -40,7 +55,26 @@ include $base . 'sidebar.php';
             <?php if ($q !== '') : ?><a href="index.php" class="btn btn-outline-secondary">Reset</a><?php endif; ?>
         </div>
     </form>
+<form method="GET" style="margin: 15px 0;">
 
+        <label>Filter Status:</label>
+
+        <select name="status" onchange="this.form.submit()">
+
+            <option value="Semua"
+                <?= $status == 'Semua' ? 'selected' : ''; ?>>
+                Semua Status
+            </option>
+
+            <option value="Aktif"
+                <?= $status == 'Aktif' ? 'selected' : ''; ?>>
+                Aktif
+            </option>
+        </select>
+
+    </form>
+
+</select>
     <table>
         <thead>
             <tr>

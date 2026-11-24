@@ -2,10 +2,32 @@
 $base = '../'; $menu = 'margin';
 require_once $base . 'helpers.php';
 require_login();
-require_role([ROLE_APOTEKER]);
-
+require_role([ROLE_SUPERADMIN]);
 global $conn;
-$result = $conn->query("SELECT * FROM viewmargin ORDER BY ID DESC");
+
+$status = $_GET['status'] ?? 'Aktif';
+$q = trim($_GET['q'] ?? '');
+
+if ($status == 'Aktif') {
+    $query = "SELECT * FROM viewmarginaktif";
+} else {
+    $query = "SELECT * FROM viewmargin";
+}
+
+if ($q !== '') {
+    $query .= " WHERE persen LIKE ?";
+}
+
+$query .= " ORDER BY ID ASC";
+
+$stmt = $conn->prepare($query);
+if ($q !== '') {
+    $like = "%$q%";
+    $stmt->bind_param('s', $like);
+}
+
+$stmt->execute();
+$result = $stmt->get_result();
 
 include $base . 'navbar.php';
 include $base . 'sidebar.php';
@@ -16,7 +38,24 @@ include $base . 'sidebar.php';
         <h3 class="mb-0">Margin Penjualan</h3>
         <a href="form.php" class="btn btn-primary btn-sm">+ Tambah Margin</a>
     </div>
+<form method="GET" style="margin: 15px 0;">
 
+        <label>Filter Status:</label>
+
+        <select name="status" onchange="this.form.submit()">
+
+            <option value="Semua"
+                <?= $status == 'Semua' ? 'selected' : ''; ?>>
+                Semua Status
+            </option>
+
+            <option value="Aktif"
+                <?= $status == 'Aktif' ? 'selected' : ''; ?>>
+                Aktif
+            </option>
+        </select>
+
+    </form>
     <?php show_flash(); ?>
 
     <div class="alert alert-info py-2">

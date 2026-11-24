@@ -49,16 +49,16 @@ include $base . 'sidebar.php';
     <?php if ($diproses) : ?>
         <div class="alert alert-warning py-2">
             Isi <b>jumlah diterima</b> sesuai barang yang benar-benar datang (boleh kurang dari sisa, isi 0 jika belum dikirim)
-            dan koreksi <b>harga terima</b> bila perlu. Sisa yang belum dikirim bisa diterima di penerimaan berikutnya.
-            Saat diselesaikan, stok masuk dan harga barang diperbarui sesuai harga terima.
+            dan koreksi <b>harga terima</b> bila perlu. Saat tombol simpan ditekan, penerimaan langsung selesai,
+            stok masuk, dan sisa yang belum dikirim bisa diterima pada penerimaan berikutnya.
         </div>
     <?php endif; ?>
 
     <?php if ($diproses) : ?>
-        <div class="small text-muted mb-2">Sisa di halaman pengadaan baru berkurang setelah penerimaan ini <b>diselesaikan</b>.</div>
+        <div class="small text-muted mb-2">Setelah disimpan, jumlah diterima dan sisa pengadaan akan langsung diperbarui.</div>
     <?php endif; ?>
 
-    <form method="post" action="ubah_harga.php">
+    <form method="post" action="selesai.php">
         <?= csrf_field() ?>
         <input type="hidden" name="id" value="<?= (int)$pn['ID'] ?>">
 
@@ -103,10 +103,9 @@ include $base . 'sidebar.php';
 
         <?php if ($diproses) : ?>
         <div class="mt-3 d-flex gap-2">
-            <button class="btn btn-primary">Simpan</button>
-            <button class="btn btn-success" formaction="selesai.php"
-                    onclick="return confirm('Selesaikan penerimaan ini? Stok masuk, harga barang diperbarui, dan data tidak bisa diubah lagi.')">
-                Simpan &amp; Selesaikan Penerimaan
+            <button type="submit" class="btn btn-success"
+                    onclick="return confirm('Simpan penerimaan ini? Stok akan langsung bertambah sesuai jumlah diterima dan data tidak bisa diubah lagi.')">
+                Simpan Penerimaan
             </button>
         </div>
         <?php endif; ?>

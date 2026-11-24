@@ -5,7 +5,29 @@ require_login();
 global $conn;
 
 $canEdit = has_role([ROLE_APOTEKER, ROLE_GUDANG]);
-$result = $conn->query("SELECT * FROM viewsatuan ORDER BY ID");
+$status = $_GET['status'] ?? 'Aktif';
+$q = trim($_GET['q'] ?? '');
+
+if ($status == 'Aktif') {
+    $query = "SELECT * FROM viewsatuanaktif";
+} else {
+    $query = "SELECT * FROM viewsatuan";
+}
+
+if ($q !== '') {
+    $query .= " WHERE nama_satuan LIKE ?";
+}
+
+$query .= " ORDER BY ID ASC";
+
+$stmt = $conn->prepare($query);
+if ($q !== '') {
+    $like = "%$q%";
+    $stmt->bind_param('s', $like);
+}
+
+$stmt->execute();
+$result = $stmt->get_result();
 
 include $base . 'navbar.php';
 include $base . 'sidebar.php';
@@ -18,7 +40,24 @@ include $base . 'sidebar.php';
             <a href="form.php" class="btn btn-primary btn-sm">+ Tambah Satuan</a>
         <?php endif; ?>
     </div>
+<form method="GET" style="margin: 15px 0;">
 
+        <label>Filter Status:</label>
+
+        <select name="status" onchange="this.form.submit()">
+
+            <option value="Semua"
+                <?= $status == 'Semua' ? 'selected' : ''; ?>>
+                Semua Status
+            </option>
+
+            <option value="Aktif"
+                <?= $status == 'Aktif' ? 'selected' : ''; ?>>
+                Aktif
+            </option>
+        </select>
+
+    </form>
     <?php show_flash(); ?>
 
     <table>

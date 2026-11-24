@@ -12,11 +12,20 @@ include $base . 'sidebar.php';
 ?>
 
 <div class="container-fluid">
-    <h3 class="mb-3">Penerimaan Barang</h3>
+    <div class="container-fluid">
+    <div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="mb-0">Penerimaan Barang</h3>
+        <a href="tambah.php" class="btn btn-primary btn-sm">
+            + Tambah Penerimaan
+        </a>
+    </div>
+    </div>
+
     <?php show_flash(); ?>
     <div class="alert alert-info py-2">
         Penerimaan dibuat dari halaman <a href="../pengadaan/index.php">Pengadaan</a> lewat tombol <b>Terima Barang</b>.
-        Stok baru masuk setelah penerimaan <b>diselesaikan</b>.
+        Saat penerimaan disimpan, transaksi langsung selesai dan stok langsung diperbarui.
     </div>
 
     <table>

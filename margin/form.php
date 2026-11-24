@@ -3,7 +3,8 @@ $base = '../'; $menu = 'margin';
 require_once $base . 'helpers.php';
 global $conn;
 require_login();
-require_role([ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN]);
+global $conn;
 
 $id   = (int)($_GET['id'] ?? 0);
 $edit = $id > 0;

@@ -157,7 +157,7 @@ include $base . 'sidebar.php';
             <button class="btn btn-success"><?= $penerimaan ? 'Terima Sisa Barang' : 'Terima Barang' ?></button>
         </form>
         <?php elseif ($proses && $adaTerbuka) : ?>
-            <span class="text-muted small">Sisa baru berkurang setelah penerimaan yang sedang diproses <b>diselesaikan</b>.</span>
+            <span class="text-muted small">Selesaikan pengisian penerimaan agar stok dan sisa pengadaan langsung diperbarui.</span>
         <?php endif; ?>
 
         <?php if ($bolehUbah) : ?>

@@ -3,7 +3,8 @@ $base = '../';
 require_once $base . 'helpers.php';
 global $conn;
 require_login();
-require_role([ROLE_APOTEKER]);
+require_role([ROLE_SUPERADMIN]);
+global $conn;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
